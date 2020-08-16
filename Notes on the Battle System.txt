@@ -1,0 +1,90 @@
+PKMN Battle Lab
+Thanks for downloading the Pokemon Battle lab! This is a work in progress, and I'll be expanding on the Battle Lab as I work on my game. For now, I wanted to share what I have so far that other people interested in creating
+PKMN games in GBStudio could see someone else's approach.
+
+In this doc, you'll find some notes and thoughts on my approach to creating the battle system, and some ideas on how to implement things that I decided not to work on!
+
+//Concessions I had to make:
+From what I can tell from messing around in GB Studio this week, you cannot store Strings in variables.
+This meant that I'd need to pick a description for each attack in the menu that would be easy for players to understand on the fly instead of just having 4 moves names "1" "2" "3" "4", or a static set of moves that wouldn't change as you play.
+Also, the character limit for menu text was more restrictive than I expected, so I we had to work within the 6 character threshold for descriptive buttons.
+
+The solution I came up with was to group moves into 3 categories:
+> ATTACK moves, which are mainly focused on dealing damage (and tend to have QTEs, more on that later)
+> DEFEND moves, which heal / clear status conditions / or protect
+> STATUS moves, which all can apply a status condition.
+
+Since I broke the moves into categories, each move has a ID#, and can be stored in a variable for that category.
+That means you can create move tutors or even TMs that can replace a Pokemon's starting loadout!
+
+The fourth category is POWER. Since I decided to focus entirely on solo battles, and no pokemon switching, I wanted the player's 
+starter choice to still feel like it matters. Since I was already looking to the TCG occasionaly for some move ideas, I
+went with "POKEMON POWER". A Power is a unique ability a pokemon has, and can normally only be used once per battle (moves or items could refresh it).
+Pokemon Power could also be used to make Boss fights feel different than normal enemies.
+
+I also chose to forgo WEAKNESSES and RESITANCE. While these are staples of POKEMON battles, I mostly wanted to focus on getting a working battle system and then jump into building a game.
+
+Since I've added STAB, I think Weaknesses/Resistances could also be handled in a similiar way. I'm thinking the most organized way is probably a combination of SWITCH and comparing type variables.
+I don't think I'll be implementing this any time soon, as my scripts are already running long, but if you think of a simple solution I'd love to hear it!
+
+//STATS & Boosts
+This system started out trying to be very simple. It's gotten more complicated, even while writing this. I didn't have STAB, SPEED, or EVASION when I started writing this README, but as I typed out 
+my excuse I decided to add them beacuse it was too easy not to. After I started working on version 3, I even added in ATK mods.
+That being said, currently, this battle system only uses the following stats:
+ - HP (duh)
+ - Evasion (subtracted from the accuracy roll.)
+ - Speed (currently only used to determine turn order, maybe some pokemon powers. You could easily add this into more damage formulas if you'd like)
+ - ATK (Boosts and Decreases)
+
+DEFENSE is currently not on my radar. My original battle system included a defense stat, but it was VERY spammable and made the battles too grindy. I've decided against it for now, but if you'd like to work on it, let me know how you implemented it!
+
+
+//Capturing Pokemon
+Capturing Pokemon is not included. I have no plans to add it, at least within the current framework I'm using.
+Since my battles are scenes, you'd need to make a variation of each scene for each pokemon you want in your dex to capture. You'd also probably need more variables.
+You could make smaller custom dexes to fill out, which could cut down on the number of variables you'd need to track, but don't even get me started on Box Management in GB Studio.
+
+
+//Battles & Pokemon teams
+My current system handles battles by making the scene background show the pokemon. The more pokemon you include in the game, the more scenes you need to add.
+If you start allowing the player to change pokemon, you need to make a version of the scene for each possible combination.
+The demo here allows you to pick from a starter from 3 types from 1 generation. That's 3 scenes for each pokemon, and we're only dealing with 1 enemy to battle here.
+My main game is working with all 3 starters from 3 generations, so I'm already at 9 scenes per encounter.
+
+If you do want to enable switching, my best guess on how to handle it would be to add the switch choice to the menu, show the options for your party, and then change to the appropriate combo of Pokemon+Enemy.
+Since the "Battle Started" script has already run, "Battle Started?" should be TRUE, so switching to the scene *should* remember all combat variables / stats being tracked for the enemy. Tracking your party's stats
+individually sounds like a nightmare though. Between HP, SPEED, and EVASION being tracked currently, you'd bee storing a lot more to call on demand and I could see it getting cumbersome. 
+
+No plans to add party switching DURING BATTLE to this system are on my radar, but it'd be a lot easier to implement an out of battle party switch OR NPC that lets you change your pokemon. That would basically
+just run the character creation script again, so it should be a piece of cake. I do have plans to implement that when I release my game.
+
+//Challenges so far
+Honestly, at this point, I really think I'd recommend just writing your own code if you want to make a Pokemon game. GBStudio is fun, but the restrictions are *very* restrictive. I'd often encounter an issue or limitation
+that I could have easily solved by writing my own code in Godot, but took some extra thinking on how to work with GBStudio's events.
+
+The biggest issue I've encountered so far was using the Scene Stack to track moving in and out of battles. In my original script, after initiating a battle, that scene would be added as the FIRST scene on the stack. Losing a Battle 
+teleported you to the PokeCenter, which didn't seem to have any issues, but if you won the battle and restored the scene, you'd continue the LOOP FOREVER even though you were no longer in that scene. I'd tried multiple ways around this,
+and ultimately landed on creating INTERLUDE scenes that change scene between map <> battle. Unfortunately, this wasn't perfect; version 2 of this battle system was easily trapped in infinite loops even with a scene change.
+
+This version checks that with a combination of: multiple "stop script" checkpoints, scene changes, the interlude scenes, AND some global variables that also act as checkpoints. I've also mitigated a LOT of issues with version 2
+but delegating various aspects of a battle to ACTORS in the battle scene now, and managing turns by invoking actors and stopping scripts at the relevant points.
+
+There are other minor frustrations, such as it sometimes being difficult to keep track of what text you need to change, and GBstudio seems to sometimes forget a change that was made. Otherwise, it's been pretty straightforward.
+
+//The Battle Sequence
+A battle in BATTLE LAB starts by running some basic setup functions. After that, it sets a Battle Ongoing variable to true, so that this doesn't run again.
+While that variable is true, a turn loops forever. A turn flows by:
+> Invoking the Weather
+> Checking if anyone's died
+> Determining turn order (speed check)
+> invoking the player / enemy (whoever won the speed check)
+> the player/enemy makes their selections. attacks invoke the BATTLE actor
+> battle actor handles all the moves
+> Check if anyone's died
+> repeat from the top
+
+
+This has seemed to be the most smooth so far. I ran into a major headache before launch with adjusting how you can run from a fight, but it looks like that's solved. And based on my sequencing, status effects from moves are checked and applied
+before damage, and that results in the animation player AFTER it, which isn't the most aesthetically pleasing, but it works. And after two solid weeks of working on this, that's all I want.
+
+It's still a little more cumbersome than I'd like; but some of that's my fault as I added more difficult concepts (like Sandstorm and Hail, or having battle items AND berries), but the skeleton of this system is really straightforward.
